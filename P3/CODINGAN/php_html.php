@@ -14,7 +14,7 @@
     echo "Tanggal hari ini: " . date("l, d F Y") . "<br>";
     echo "Nama saya adalah Giza Aurelya<br>";
     echo "NIM: 2402032<br>";
-    echo "Terima kasih semuanya 😊";
+    echo "Terima kasih semuanya";
     ?>
 </p>
 
