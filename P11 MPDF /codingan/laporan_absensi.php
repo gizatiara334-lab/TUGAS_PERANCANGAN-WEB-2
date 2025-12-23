@@ -13,24 +13,30 @@ function e($s){ return htmlspecialchars($s, ENT_QUOTES); }
 $tgl = $_GET['tanggal'] ?? date('Y-m-d');
 $kelas = $_GET['kelas'] ?? '';
 
-// === TAMBAHAN DATA GRAFIK (TANPA UBAH QUERY LAMA) ===
+/* ======================
+   HITUNG REKAP
+====================== */
 function hitung($koneksi,$tgl,$status){
     $q = mysqli_query($koneksi,"
         SELECT COUNT(*) AS total 
         FROM tbl_absensi 
         WHERE tanggal='$tgl' AND status='$status'
     ");
+    if(!$q) return 0;
     $r = mysqli_fetch_assoc($q);
     return $r['total'] ?? 0;
 }
-$hadir = hitung($koneksi,$tgl,'Hadir');
-$izin  = hitung($koneksi,$tgl,'Izin');
-$alpa  = hitung($koneksi,$tgl,'Alpa');
-$total = $hadir + $izin + $alpa;
+
+$hadir  = hitung($koneksi,$tgl,'Hadir');
+$izin   = hitung($koneksi,$tgl,'Izin');
+$sakit  = hitung($koneksi,$tgl,'Sakit');
+$alpa   = hitung($koneksi,$tgl,'Alpha');
+
+$total = $hadir + $izin + $sakit + $alpa;
 $persen_hadir = $total ? round(($hadir/$total)*100,1) : 0;
 $persen_izin  = $total ? round(($izin/$total)*100,1) : 0;
+$persen_sakit = $total ? round(($sakit/$total)*100,1) : 0;
 $persen_alpa  = $total ? round(($alpa/$total)*100,1) : 0;
-
 ?>
 
 <!DOCTYPE html>
@@ -80,10 +86,8 @@ echo "<option value='{$k['id_kelas']}' $sel>{$k['nama_kelas']}</option>";
 <button type="submit">🔍 Filter</button>
 </form>
 
-<!-- === TAMBAHAN TOMBOL === -->
 <div style="margin-bottom:15px;display:flex;gap:10px">
 <button onclick="window.print()">🖨️ Cetak</button>
-
 <a href="export_excel_absensi.php?tanggal=<?= $tgl ?>&kelas=<?= $kelas ?>">
 <button type="button">📥 Export Excel</button>
 </a>
@@ -91,13 +95,15 @@ echo "<option value='{$k['id_kelas']}' $sel>{$k['nama_kelas']}</option>";
 <a href="export_pdf_absensi.php?tanggal=<?= $tgl ?>&kelas=<?= $kelas ?>">
 <button type="button">📄 Export PDF</button>
 </a>
+
 </div>
 
-<!-- === TAMBAHAN GRAFIK === -->
+<!-- GRAFIK -->
 <canvas id="grafik" height="100"></canvas>
-<div style="margin:15px 0;display:flex;gap:15px">
+<div style="margin:15px 0;display:flex;gap:15px;flex-wrap:wrap">
 <div><b>Hadir:</b> <?= $persen_hadir ?>%</div>
 <div><b>Izin:</b> <?= $persen_izin ?>%</div>
+<div><b>Sakit:</b> <?= $persen_sakit ?>%</div>
 <div><b>Alpa:</b> <?= $persen_alpa ?>%</div>
 </div>
 
@@ -107,7 +113,6 @@ echo "<option value='{$k['id_kelas']}' $sel>{$k['nama_kelas']}</option>";
 <th>Nama Siswa</th>
 <th>Kelas</th>
 <th>Tanggal</th>
-<th>Jam</th>
 <th>Status</th>
 </tr>
 
@@ -116,17 +121,17 @@ $where = "WHERE a.tanggal='$tgl'";
 if($kelas!='') $where .= " AND s.id_kelas='$kelas'";
 
 $q = mysqli_query($koneksi,"
-SELECT s.nama_siswa, k.nama_kelas, a.tanggal, a.jam, a.status
+SELECT s.nama_siswa, k.nama_kelas, a.tanggal, a.status
 FROM tbl_absensi a
 JOIN tbl_siswa s ON a.id_siswa=s.id_siswa
 JOIN tbl_kelas k ON s.id_kelas=k.id_kelas
 $where
-ORDER BY a.jam ASC
+ORDER BY s.nama_siswa ASC
 ");
 
 $no=1;
-if(mysqli_num_rows($q)==0){
-echo "<tr><td colspan='6'>Data tidak ditemukan</td></tr>";
+if(!$q || mysqli_num_rows($q)==0){
+echo "<tr><td colspan='5'>Data tidak ditemukan</td></tr>";
 }else{
 while($r=mysqli_fetch_assoc($q)){
 echo "
@@ -135,7 +140,6 @@ echo "
 <td>".e($r['nama_siswa'])."</td>
 <td>".e($r['nama_kelas'])."</td>
 <td>{$r['tanggal']}</td>
-<td>{$r['jam']}</td>
 <td><b>{$r['status']}</b></td>
 </tr>";
 $no++;
@@ -149,9 +153,9 @@ $no++;
 new Chart(document.getElementById('grafik'),{
 type:'bar',
 data:{
-labels:['Hadir','Izin','Alpa'],
+labels:['Hadir','Izin','Sakit','Alpa'],
 datasets:[{
-data:[<?= $hadir ?>,<?= $izin ?>,<?= $alpa ?>]
+data:[<?= $hadir ?>,<?= $izin ?>,<?= $sakit ?>,<?= $alpa ?>]
 }]
 },
 options:{scales:{y:{beginAtZero:true}}}
